@@ -1,0 +1,6 @@
+target/
+dist/
+*.db
+.idea/
+*.iml
+.vscode/
