@@ -9,12 +9,13 @@ cp target/comments-closet.jar dist/input/
 
 jpackage --type app-image --name CommentsCloset --app-version 1.0.0 \
   --input dist/input --main-jar comments-closet.jar --main-class com.commentscloset.Launcher \
-  --dest dist
+  --icon packaging/icon.png --dest dist
 
 APPDIR=dist/CommentsCloset.AppDir
 mkdir -p "$APPDIR/usr"
 cp -r dist/CommentsCloset/* "$APPDIR/usr/"
-cp dist/CommentsCloset/lib/CommentsCloset.png "$APPDIR/CommentsCloset.png"
+cp packaging/icon.png "$APPDIR/CommentsCloset.png"
+cp packaging/icon.png "$APPDIR/.DirIcon"
 cat > "$APPDIR/CommentsCloset.desktop" <<DESK
 [Desktop Entry]
 Type=Application

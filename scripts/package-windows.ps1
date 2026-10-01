@@ -9,6 +9,6 @@ Copy-Item target\comments-closet.jar dist\input\
 
 jpackage --type exe --name CommentsCloset --app-version 1.0.0 `
   --input dist\input --main-jar comments-closet.jar --main-class com.commentscloset.Launcher `
-  --dest dist --win-shortcut --win-menu --win-dir-chooser
+  --icon packaging\icon.ico --dest dist --win-shortcut --win-menu --win-dir-chooser
 if ($LASTEXITCODE -ne 0) { throw "jpackage failed" }
 Write-Host "Готово: dist\CommentsCloset-1.0.0.exe"

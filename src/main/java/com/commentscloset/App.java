@@ -85,6 +85,7 @@ public class App extends Application {
         reloadChannels();
         refreshList();
 
+        stage.getIcons().add(new javafx.scene.image.Image(App.class.getResourceAsStream("/icon.png")));
         stage.setTitle("CommentsCloset");
         stage.setScene(new Scene(root, 900, 700));
         stage.show();
