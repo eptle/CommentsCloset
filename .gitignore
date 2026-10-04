@@ -4,3 +4,5 @@ dist/
 .idea/
 *.iml
 .vscode/
+!src/main/resources/seed/comments.db
+.env

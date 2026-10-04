@@ -3,9 +3,13 @@ package com.commentscloset;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-/** Каталог данных приложения: %APPDATA%\CommentsCloset на Windows, ~/.config/CommentsCloset на Linux. */
+/**
+ * Каталог данных приложения: %APPDATA%\CommentsCloset на Windows,
+ * ~/.config/CommentsCloset на Linux.
+ */
 public final class AppPaths {
-    private AppPaths() {}
+    private AppPaths() {
+    }
 
     public static Path dataDir() {
         String os = System.getProperty("os.name", "").toLowerCase();

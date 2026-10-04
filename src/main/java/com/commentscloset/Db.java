@@ -15,8 +15,50 @@ public class Db implements AutoCloseable {
 
     private final Connection conn;
 
+    /** Основная БД пользователя. При первом запуске копируется из встроенной заготовки /seed/comments.db (если есть). */
     public Db() {
-        this("jdbc:sqlite:" + AppPaths.dataDir().resolve("comments.db"));
+        this("jdbc:sqlite:" + prepareUserDb());
+    }
+
+    private static java.nio.file.Path prepareUserDb() {
+        java.nio.file.Path file = AppPaths.dataDir().resolve("comments.db");
+        if (!java.nio.file.Files.exists(file)) {
+            try (java.io.InputStream in = Db.class.getResourceAsStream("/seed/comments.db")) {
+                if (in != null) java.nio.file.Files.copy(in, file);
+            } catch (java.io.IOException e) {
+                throw new IllegalStateException("Не удалось развернуть встроенную БД", e);
+            }
+        }
+        return file;
+    }
+
+    /** Сохраняет компактную копию БД одним файлом (для встраивания в сборку). */
+    public synchronized void exportTo(java.nio.file.Path target) {
+        try {
+            java.nio.file.Files.deleteIfExists(target);
+            if (target.getParent() != null) java.nio.file.Files.createDirectories(target.getParent());
+            try (Statement st = conn.createStatement()) {
+                st.execute("VACUUM INTO '" + target.toAbsolutePath().toString().replace("'", "''") + "'");
+            }
+        } catch (Exception e) {
+            throw new IllegalStateException("Не удалось экспортировать БД", e);
+        }
+    }
+
+    /** Ссылки на каналы из БД — чтобы заполнить поле настроек у нового пользователя. */
+    public synchronized List<String> channelLinks() {
+        List<String> list = new ArrayList<>();
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT id,handle FROM channels ORDER BY title")) {
+            while (rs.next()) {
+                String handle = rs.getString(2);
+                list.add("https://www.youtube.com/" + (handle != null && handle.startsWith("@")
+                        ? handle : "channel/" + rs.getString(1)));
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException(e);
+        }
+        return list;
     }
 
     public Db(String url) {

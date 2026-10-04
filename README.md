@@ -20,3 +20,9 @@
 - Windows exe: `scripts\package-windows.ps1` (нужен WiX Toolset 3.x) → `dist\CommentsCloset-1.0.0.exe`
 - Оба варианта собирает GitHub Actions (`.github/workflows/build.yml`, вручную или по тегу `v*`).
   `jpackage` не умеет кросс-компиляцию, поэтому каждая ОС собирается на своей.
+
+## Встроенная база с комментариями
+1. `cp .env.example .env` и заполните `YOUTUBE_API_KEY` и `CHANNELS` (ссылки через запятую).
+2. `./mvnw package && java -jar target/comments-closet.jar --generate-seed` — создаст `src/main/resources/seed/comments.db`
+   (пользовательская база не затрагивается; путь к другому .env — аргументом).
+3. Пересоберите пакет. При первом запуске приложение разворачивает эту базу и подставляет каналы в настройки.

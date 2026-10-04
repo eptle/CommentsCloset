@@ -1,5 +1,6 @@
 package com.commentscloset;
 
+import javafx.animation.FadeTransition;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.application.Application;
@@ -7,6 +8,7 @@ import javafx.application.Platform;
 import javafx.concurrent.Task;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
@@ -42,6 +44,7 @@ public class App extends Application {
     public void start(Stage stage) {
         db = new Db();
         config = Config.load();
+        if (config.channels.isEmpty()) config.channels = db.channelLinks(); // каналы из встроенной БД
 
         apiKeyField.setPromptText("API-ключ YouTube Data API v3");
         apiKeyField.setText(config.apiKey);
@@ -150,48 +153,108 @@ public class App extends Application {
 
     // ---------- виджет ----------
 
+    private static final int WIDGET_SIZE = 5;
+    private static final int WIDGET_POOL = 100;
+    private static final int WIDGET_MAX_LINES = 7;
+
+    /** Показывает 5 последних комментариев; раз в 10 секунд верхний исчезает, снизу появляется следующий. */
     private void toggleWidget() {
         if (widget != null) { widget.close(); return; }
-        Label text = new Label("Нет комментариев");
-        text.setWrapText(true);
-        text.setStyle("-fx-text-fill: white; -fx-font-size: 14px;");
-        Label meta = new Label();
-        meta.setStyle("-fx-text-fill: #aaaaaa; -fx-font-size: 11px;");
+
+        Label title = new Label("Последние комментарии");
+        title.setStyle("-fx-text-fill: #aaaaaa; -fx-font-size: 11px;");
         Label close = new Label("✕");
         close.setStyle("-fx-text-fill: #aaaaaa; -fx-cursor: hand;");
-        HBox top = new HBox(meta, new Region(), close);
-        HBox.setHgrow(top.getChildren().get(1), Priority.ALWAYS);
-        VBox box = new VBox(6, top, text);
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        HBox top = new HBox(title, spacer, close);
+
+        VBox cards = new VBox(8);
+        VBox box = new VBox(8, top, cards);
         box.setPadding(new Insets(10));
         box.setStyle("-fx-background-color: rgba(25,25,30,0.92); -fx-background-radius: 10;");
 
         Stage w = new Stage(StageStyle.TRANSPARENT);
         w.setAlwaysOnTop(true);
-        Scene sc = new Scene(box, 340, 130);
+        box.setPrefWidth(380);
+        Scene sc = new Scene(box); // высота по содержимому
         sc.setFill(null);
         w.setScene(sc);
+        // подгоняем окно под содержимое при каждом изменении высоты
+        box.heightProperty().addListener((o, a, b) -> Platform.runLater(w::sizeToScene));
         w.setTitle("CommentsCloset");
 
         double[] drag = new double[2];
         box.setOnMousePressed(e -> { drag[0] = e.getScreenX() - w.getX(); drag[1] = e.getScreenY() - w.getY(); });
         box.setOnMouseDragged(e -> { w.setX(e.getScreenX() - drag[0]); w.setY(e.getScreenY() - drag[1]); });
 
-        Runnable next = () -> {
+        // очередь: свежие комментарии от новых к старым; после конца идём по кругу
+        java.util.ArrayDeque<Db.CommentRow> queue = new java.util.ArrayDeque<>();
+        Runnable reload = () -> {
             Db.Channel ch = channelBox.getValue();
-            List<Db.CommentRow> r = db.comments(ch == null ? null : ch.id(), null, 1, true);
-            if (r.isEmpty()) return;
-            Db.CommentRow c = r.get(0);
-            text.setText(c.text());
-            meta.setText(c.author() + " · " + c.channelTitle());
+            queue.clear();
+            queue.addAll(db.comments(ch == null ? null : ch.id(), null, WIDGET_POOL, false));
         };
-        next.run();
-        Timeline tl = new Timeline(new KeyFrame(Duration.seconds(10), e -> next.run()));
+        java.util.function.Supplier<Node> nextCard = () -> {
+            if (queue.isEmpty()) reload.run();
+            return queue.isEmpty() ? null : widgetCard(queue.poll());
+        };
+
+        reload.run();
+        for (int i = 0; i < WIDGET_SIZE; i++) {
+            Node n = nextCard.get();
+            if (n != null) cards.getChildren().add(n);
+        }
+        if (cards.getChildren().isEmpty()) cards.getChildren().add(new Label("Нет комментариев"));
+
+        Timeline tl = new Timeline(new KeyFrame(Duration.seconds(10), e -> {
+            if (cards.getChildren().size() < WIDGET_SIZE) { // пока было пусто — пробуем заполнить
+                cards.getChildren().removeIf(n -> n instanceof Label);
+                while (cards.getChildren().size() < WIDGET_SIZE) {
+                    Node n = nextCard.get();
+                    if (n == null) return;
+                    cards.getChildren().add(n);
+                }
+                return;
+            }
+            Node first = cards.getChildren().get(0);
+            FadeTransition out = new FadeTransition(Duration.millis(500), first);
+            out.setToValue(0);
+            out.setOnFinished(ev -> {
+                cards.getChildren().remove(first);
+                Node n = nextCard.get();
+                if (n != null) {
+                    n.setOpacity(0);
+                    cards.getChildren().add(n);
+                    FadeTransition in = new FadeTransition(Duration.millis(500), n);
+                    in.setToValue(1);
+                    in.play();
+                }
+            });
+            out.play();
+        }));
         tl.setCycleCount(Timeline.INDEFINITE);
         tl.play();
         close.setOnMouseClicked(e -> w.close());
         w.setOnHidden(e -> { tl.stop(); widget = null; });
         widget = w;
         w.show();
+    }
+
+    private static Node widgetCard(Db.CommentRow c) {
+        Label meta = new Label(c.author() + " · " + c.channelTitle());
+        meta.setStyle("-fx-text-fill: #aaaaaa; -fx-font-size: 11px;");
+        Label text = new Label(c.text());
+        text.setWrapText(true);
+        text.setMaxWidth(340);
+        text.setStyle("-fx-text-fill: white; -fx-font-size: 13px;");
+        // до WIDGET_MAX_LINES строк (дальше многоточие); короткий комментарий занимает меньше места
+        javafx.scene.text.Text probe = new javafx.scene.text.Text("A");
+        probe.setFont(javafx.scene.text.Font.font(text.getFont().getFamily(), 13));
+        text.setMaxHeight(Math.ceil(probe.getLayoutBounds().getHeight()) * WIDGET_MAX_LINES);
+        VBox card = new VBox(2, meta, text);
+        card.setMinHeight(Region.USE_PREF_SIZE);
+        return card;
     }
 
     @Override

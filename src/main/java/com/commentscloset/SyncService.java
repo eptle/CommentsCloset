@@ -10,10 +10,16 @@ public class SyncService {
 
     private final Db db;
     private final YouTubeClient yt;
+    private final int maxVideos;
 
     public SyncService(Db db, YouTubeClient yt) {
+        this(db, yt, MAX_VIDEOS_PER_CHANNEL);
+    }
+
+    public SyncService(Db db, YouTubeClient yt, int maxVideos) {
         this.db = db;
         this.yt = yt;
+        this.maxVideos = maxVideos;
     }
 
     /** @return число новых/обновлённых комментариев. */
@@ -39,7 +45,7 @@ public class SyncService {
         db.upsertChannel(ch.id(), ch.title(), ch.handle(), ch.uploadsPlaylist());
 
         List<YouTubeClient.Video> videos = new java.util.ArrayList<>();
-        yt.forEachVideo(ch.uploadsPlaylist(), MAX_VIDEOS_PER_CHANNEL, videos::add);
+        yt.forEachVideo(ch.uploadsPlaylist(), maxVideos, videos::add);
 
         int i = 0;
         for (YouTubeClient.Video v : videos) {
