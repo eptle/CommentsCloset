@@ -161,7 +161,7 @@ public class App extends Application {
     private void toggleWidget() {
         if (widget != null) { widget.close(); return; }
 
-        Label title = new Label("Последние комментарии");
+        Label title = new Label("Зашкафные комментарии");
         title.setStyle("-fx-text-fill: #aaaaaa; -fx-font-size: 11px;");
         Label close = new Label("✕");
         close.setStyle("-fx-text-fill: #aaaaaa; -fx-cursor: hand;");
@@ -241,7 +241,7 @@ public class App extends Application {
         w.show();
     }
 
-    private static Node widgetCard(Db.CommentRow c) {
+    private Node widgetCard(Db.CommentRow c) {
         Label meta = new Label(c.author() + " · " + c.channelTitle());
         meta.setStyle("-fx-text-fill: #aaaaaa; -fx-font-size: 11px;");
         Label text = new Label(c.text());
@@ -252,8 +252,16 @@ public class App extends Application {
         javafx.scene.text.Text probe = new javafx.scene.text.Text("A");
         probe.setFont(javafx.scene.text.Font.font(text.getFont().getFamily(), 13));
         text.setMaxHeight(Math.ceil(probe.getLayoutBounds().getHeight()) * WIDGET_MAX_LINES);
-        VBox card = new VBox(2, meta, text);
+        Label video = new Label("▶ " + c.videoTitle());
+        video.setMaxWidth(340);
+        video.setStyle("-fx-text-fill: #6fa8ff; -fx-font-size: 11px;");
+        VBox card = new VBox(2, meta, text, video);
         card.setMinHeight(Region.USE_PREF_SIZE);
+        card.setStyle("-fx-cursor: hand;");
+        // клик (не перетаскивание) открывает видео в браузере
+        card.setOnMouseClicked(e -> {
+            if (e.isStillSincePress()) getHostServices().showDocument("https://www.youtube.com/watch?v=" + c.videoId());
+        });
         return card;
     }
 
